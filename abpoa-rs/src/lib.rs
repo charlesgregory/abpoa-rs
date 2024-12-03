@@ -29,7 +29,7 @@ pub enum AlignmentMode {
 #[repr(u32)]
 pub enum ConsensusAlgorithm {
     HeaviestBundle = ffi::ABPOA_HB,
-    Majority = ffi::ABPOA_MC,
+    Majority = ffi::ABPOA_MF,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
@@ -93,6 +93,14 @@ impl AlignmentParametersBuilder {
             (*abpoa_params).set_out_cons(1);
         }
         AlignmentParametersBuilder { abpoa_params }
+    }
+
+    pub fn enable_seeding(self) -> Self {
+        unsafe {
+            (*self.abpoa_params).set_disable_seeding(0);
+        }
+
+        self
     }
 
     pub fn alignment_mode(self, mode: AlignmentMode) -> Self {
