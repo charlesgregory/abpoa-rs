@@ -271,7 +271,7 @@ impl AlignmentParametersBuilder {
         to_return
     }
 
-    fn output_msa(self, v: bool) -> Self {
+    pub fn output_msa(self, v: bool) -> Self {
         unsafe {
             (*self.abpoa_params).set_out_msa(v as u8);
         }
@@ -279,15 +279,45 @@ impl AlignmentParametersBuilder {
         self
     }
 
-    fn output_consensus(self, v: bool) -> Self {
+    pub fn output_consensus(self, v: bool) -> Self {
         unsafe {
             (*self.abpoa_params).set_out_cons(v as u8);
         }
 
         self
     }
+    pub fn ret_cigar(self, v: bool) -> Self {
+        unsafe {
+            (*self.abpoa_params).set_ret_cigar(v as u8);
+        }
+        self
+    }
 
-    fn consensus_algorithm(self, algorithm: ConsensusAlgorithm) -> Self {
+    pub fn use_qv(self, v: bool) -> Self {
+        unsafe {
+            (*self.abpoa_params).set_use_qv(v as u8);
+        }
+        self
+    }
+
+    pub fn end_bonus(self, v: i32) -> Self {
+        unsafe { (*self.abpoa_params).end_bonus = v }
+        self
+    }
+
+    pub fn zdrop(self, v: i32) -> Self {
+        unsafe { (*self.abpoa_params).zdrop = v }
+        self
+    }
+
+    pub fn progressive_poa(self, v: bool) -> Self {
+        unsafe {
+            (*self.abpoa_params).set_progressive_poa(v as u8);
+        }
+        self
+    }
+
+    pub fn consensus_algorithm(self, algorithm: ConsensusAlgorithm) -> Self {
         unsafe {
             (*self.abpoa_params).cons_algrm = algorithm as i32;
         }
@@ -295,7 +325,7 @@ impl AlignmentParametersBuilder {
         self
     }
 
-    fn max_number_of_consensus_sequences(self, n: i32) -> Self {
+    pub fn max_number_of_consensus_sequences(self, n: i32) -> Self {
         unsafe {
             (*self.abpoa_params).max_n_cons = n;
         }
@@ -303,7 +333,7 @@ impl AlignmentParametersBuilder {
         self
     }
 
-    fn min_consensus_frequency(self, f: f64) -> Self {
+    pub fn min_consensus_frequency(self, f: f64) -> Self {
         unsafe {
             (*self.abpoa_params).min_freq = f;
         }
@@ -384,7 +414,7 @@ impl Default for AlignmentParameters {
 pub enum AbpoaError {
     /// The alphabet used in the sequence does not match the graph
     InvalidAlphabet,
-    
+
     /// The alignment input is incorrect
     InvalidInput,
 }
@@ -521,8 +551,8 @@ impl Graph {
     pub fn has_consensus(&self) -> bool {
         unsafe { (*self.get_graph_ptr()).is_called_cons() > 0 && !self.get_cons_ptr().is_null() }
     }
-    
-    fn align_sequence_coded(
+
+    pub fn align_sequence_coded(
         &mut self,
         aln_params: &AlignmentParameters,
         sequence: &[u8],
@@ -545,17 +575,17 @@ impl Graph {
 
         Ok(result)
     }
-    
+
     pub fn align_sequence(
         &mut self,
         aln_params: &AlignmentParameters,
         sequence: &[u8],
     ) -> Result<AlignmentResult, AbpoaError> {
         let transformed_seq = aln_params.transform_seq(sequence);
-        
+
         self.align_sequence_coded(aln_params, &transformed_seq)
     }
-    
+
     pub fn add_alignment(
         &mut self,
         aln_params: &AlignmentParameters,
@@ -591,12 +621,12 @@ impl Graph {
     ) -> Result<AlignmentResult, AbpoaError> {
         let transformed_seq = aln_params.transform_seq(sequence);
         let result = self.align_sequence_coded(aln_params, &transformed_seq)?;
-        
+
         self.add_alignment(aln_params, sequence, weights, name, &result);
 
         Ok(result)
     }
-    
+
     pub fn align_and_add_multiple<S, W, N>(
         &mut self,
         aln_params: &AlignmentParameters,
@@ -612,21 +642,19 @@ impl Graph {
         if sequences.len() != weights.len() || sequences.len() != names.len() {
             return Err(AbpoaError::InvalidInput);
         }
-        
-        let transformed_seqs: Vec<_> = sequences.iter()
+
+        let transformed_seqs: Vec<_> = sequences
+            .iter()
             .map(|seq| aln_params.transform_seq(seq.as_ref()))
             .collect();
-        
+
         let (num_existing_seq, num_new) = self.prepare_for_new_sequences(names);
-        
+
         let mut all_results = Vec::with_capacity(sequences.len());
-        for (i, (seq, w)) in transformed_seqs.iter()
-            .zip(weights.iter())
-            .enumerate() 
-        {
+        for (i, (seq, w)) in transformed_seqs.iter().zip(weights.iter()).enumerate() {
             let result = self.align_sequence_coded(aln_params, seq)?;
             let w = w.as_ref();
-            
+
             unsafe {
                 ffi::abpoa_add_graph_alignment(
                     self.graph_impl,
@@ -641,22 +669,22 @@ impl Graph {
                     1,
                 );
             }
-            
+
             all_results.push(result);
         }
-        
+
         Ok(all_results)
     }
 
     fn prepare_for_new_sequences<N: AsRef<[u8]>>(&mut self, names: &[N]) -> (usize, usize) {
         let num_new_sequences = names.len();
         let num_existing_seq = unsafe { (*self.get_abs_ptr()).n_seq as usize };
-        
+
         unsafe {
             (*self.get_abs_ptr_mut()).n_seq += num_new_sequences as i32;
             ffi::abpoa_realloc_seq(self.get_abs_ptr_mut());
         }
-        
+
         // Set new sequence names
         for (i, name) in names.iter().enumerate() {
             unsafe {
@@ -665,7 +693,7 @@ impl Graph {
                 ffi::abpoa_cpy_str(target, n.as_ptr() as *mut i8, n.len() as i32)
             }
         }
-        
+
         (num_existing_seq, num_new_sequences)
     }
 
@@ -1382,7 +1410,7 @@ mod tests {
         assert_eq!(result2.get_num_matches(), sequence2.len() - 2);
         assert_eq!(graph.num_nodes(), 2 + sequence.len() + 2);
     }
-    
+
     #[test]
     fn test_align_multiple() {
         let aln_params = AlignmentParametersBuilder::new()
@@ -1399,18 +1427,15 @@ mod tests {
             b"AGTGTCACGTTGAC",
             b"ACGTGTACATTGAC",
         ];
-        
-        let weights: Vec<_> = test_seq.iter()
-            .map(|seq| vec![1i32; seq.len()])
-            .collect();
-        
-        let names: Vec<_> = (1..=test_seq.len())
-            .map(|i| format!("seq{}", i))
-            .collect();
-        
-        let _ = graph.align_and_add_multiple(&aln_params, &test_seq, weights.as_slice(), &names)
+
+        let weights: Vec<_> = test_seq.iter().map(|seq| vec![1i32; seq.len()]).collect();
+
+        let names: Vec<_> = (1..=test_seq.len()).map(|i| format!("seq{}", i)).collect();
+
+        let _ = graph
+            .align_and_add_multiple(&aln_params, &test_seq, weights.as_slice(), &names)
             .unwrap();
-        
+
         assert_eq!(graph.num_sequences(), 4);
     }
 
@@ -1462,14 +1487,14 @@ mod tests {
         graph.generate_rc_msa();
         let msa = graph.get_msa();
         assert_eq!(msa.len(), 4);
-        
+
         let truth = [
             b"ACGTGTACAGTTGAC",
             b"A--GGTACACGTTAC",
             b"A-GTGTCACGTTGAC",
             b"ACGTGTACA-TTGAC",
         ];
-        
+
         for (i, seq) in msa.sequences().iter().enumerate() {
             let ascii = aln_params.reverse_seq(seq);
             assert_eq!(&ascii, truth[i]);
