@@ -1246,6 +1246,7 @@ impl Drop for AlignmentResult {
 pub struct ConsensusData<'a> {
     consensus_data_impl: *const ffi::abpoa_cons_t,
     seq: Vec<&'a [u8]>,
+    qual: Vec<&'a [i32]>,
 }
 
 impl<'a> ConsensusData<'a> {
@@ -1259,10 +1260,19 @@ impl<'a> ConsensusData<'a> {
                 unsafe { std::slice::from_raw_parts(*(*cons_ptr).cons_base.add(i), *len as usize) }
             })
             .collect();
+        let qual = (0..num_seq)
+            .map(|i| {
+                let len = unsafe { (*cons_ptr).cons_len.add(i) };
+                unsafe {
+                    std::slice::from_raw_parts(*(*cons_ptr).cons_phred_score.add(i), *len as usize)
+                }
+            })
+            .collect();
 
         ConsensusData {
             consensus_data_impl: graph.get_cons_ptr(),
             seq: seqs,
+            qual,
         }
     }
 
@@ -1280,6 +1290,9 @@ impl<'a> ConsensusData<'a> {
 
     pub fn sequences(&self) -> &[&[u8]] {
         &self.seq
+    }
+    pub fn qualities(&self) -> &[&[i32]] {
+        &self.qual
     }
 }
 
